@@ -80,3 +80,305 @@ BigQuery SQL → computes accuracy → BigQuery
 
 Grafana → visualizes accuracy
 
+
+
+Weather Cloud Pipeline — Forecast, Observed, and Accuracy Engine
+
+This project is a fully‑cloud‑native weather analytics pipeline built on:
+
+
+
+Astra DB (hourly observations)
+
+
+
+BigQuery (daily forecast, observed summary, accuracy)
+
+
+
+GitHub Actions (scheduled ingestion + computation)
+
+
+
+Doppler (zero‑trust secret management)
+
+
+
+The pipeline ingests live weather data, computes daily summaries, calculates forecast accuracy, and stores everything in BigQuery for visualization in Grafana or Looker.
+
+
+
+Architecture Overview
+
+1\. Hourly Observations → Astra DB
+
+Script: weather\_pipeline.py  
+
+Workflow: .github/workflows/observed\_ingestion.yml
+
+
+
+Runs every hour
+
+
+
+Fetches latest NWS observation
+
+
+
+Streams into Astra DB collection
+
+
+
+Stores fields like temperature, humidity, wind, summary, timestamp
+
+
+
+2\. Daily Forecast → BigQuery
+
+Script: weather\_forecast\_daily.py  
+
+Workflow: .github/workflows/forecast\_ingestion.yml
+
+
+
+Runs daily
+
+
+
+Fetches NWS daily forecast
+
+
+
+Loads into BigQuery using batch load jobs
+
+
+
+Stores predicted high/low temps, POP, summary
+
+
+
+3\. Daily Observed Summary → BigQuery
+
+Script: weather\_observed\_daily.py  
+
+Workflow: .github/workflows/observed\_ingestion.yml (hourly)
+
+Summary workflow: .github/workflows/accuracy\_compute.yml (daily)
+
+
+
+Reads hourly Astra data
+
+
+
+Computes daily high/low temps, rainfall, summary
+
+
+
+Loads into BigQuery
+
+
+
+4\. Daily Accuracy → BigQuery
+
+Script: weather\_accuracy\_daily.py  
+
+Workflow: .github/workflows/accuracy\_compute.yml
+
+
+
+Compares forecast vs observed
+
+
+
+Computes error metrics
+
+
+
+Stores accuracy results in BigQuery
+
+
+
+BigQuery Tables
+
+weather\_forecast\_daily
+
+Column	Type
+
+date	DATE
+
+source\_run\_time	STRING
+
+high\_predicted\_f	INT64
+
+low\_predicted\_f	INT64
+
+pop\_predicted	INT64
+
+summary\_predicted	STRING
+
+
+
+
+
+weather\_observed\_daily
+
+Column	Type
+
+date	DATE
+
+source\_run\_time	STRING
+
+high\_actual\_f	INT64
+
+low\_actual\_f	INT64
+
+rain\_actual\_mm	FLOAT64
+
+summary\_actual	STRING
+
+
+
+
+
+weather\_accuracy\_daily
+
+Column	Type
+
+date	DATE
+
+source\_run\_time	STRING
+
+high\_error\_f	FLOAT64
+
+low\_error\_f	FLOAT64
+
+rain\_error\_mm	FLOAT64
+
+summary\_match\_score	FLOAT64
+
+
+
+
+
+GitHub Actions Workflows
+
+Hourly Observed Ingestion
+
+Code
+
+.github/workflows/observed\_ingestion.yml
+
+Daily Forecast Ingestion
+
+Code
+
+.github/workflows/forecast\_ingestion.yml
+
+Daily Accuracy Computation
+
+Code
+
+.github/workflows/accuracy\_compute.yml
+
+All workflows use:
+
+
+
+Doppler CLI Action
+
+
+
+Python 3.11
+
+
+
+Your scripts
+
+
+
+BigQuery batch load jobs
+
+
+
+Secrets (Doppler)
+
+Your gcp\_personal config must contain:
+
+
+
+Astra
+
+ASTRA\_DB\_APPLICATION\_TOKEN
+
+
+
+ASTRA\_DB\_API\_ENDPOINT
+
+
+
+Google Cloud
+
+GOOGLE\_APPLICATION\_CREDENTIALS\_JSON
+
+
+
+BQ\_PROJECT\_ID
+
+
+
+BQ\_FORECAST\_TABLE
+
+
+
+BQ\_OBSERVED\_TABLE
+
+
+
+BQ\_ACCURACY\_TABLE
+
+
+
+Local Development
+
+Run any script locally using Doppler:
+
+
+
+Code
+
+doppler run --config gcp\_personal -- python weather\_forecast\_daily.py
+
+doppler run --config gcp\_personal -- python weather\_observed\_daily.py
+
+doppler run --config gcp\_personal -- python weather\_accuracy\_daily.py
+
+Grafana / Looker Integration
+
+Once BigQuery is populated:
+
+
+
+Connect BigQuery as a data source
+
+
+
+Build dashboards for:
+
+
+
+Daily forecast
+
+
+
+Daily observed
+
+
+
+Accuracy trends
+
+
+
+Error metrics
+

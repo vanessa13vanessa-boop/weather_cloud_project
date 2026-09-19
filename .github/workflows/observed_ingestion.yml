@@ -1,0 +1,28 @@
+name: Hourly Observed Ingestion
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # Every hour
+  workflow_dispatch:
+
+jobs:
+  ingest-observed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run observed ingestion
+        uses: dopplerhq/cli-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          command: doppler run --config gcp_personal -- python weather_pipeline.py

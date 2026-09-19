@@ -1,0 +1,8 @@
+astrapy
+google-cloud-bigquery
+google-cloud-core
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+requests
+python-dateutil

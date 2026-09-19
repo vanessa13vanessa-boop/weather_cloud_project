@@ -1,0 +1,28 @@
+name: Daily Accuracy Computation
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 7 AM MDT (13 UTC)
+  workflow_dispatch:
+
+jobs:
+  compute-accuracy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run accuracy computation
+        uses: dopplerhq/cli-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          command: doppler run --config gcp_personal -- python weather_accuracy_daily.py
