@@ -16,3 +16,67 @@ An enterprise-grade, zero-trust data pipeline that extracts live, time-series we
 
 
 
+&#x20;                         ┌────────────────────────┐
+
+&#x20;                         │  NWS API Data Stream            │
+
+&#x20;                         └───────────┬────────────┘
+
+&#x20;                                         │
+
+&#x20;                                         ▼
+
+&#x20;                       ┌───────────────────────────┐
+
+&#x20;                       │    GitHub Actions VM                │◀─── \[Scheduled Every Hour]
+
+&#x20;                       │   (Serverless Compute)              │
+
+&#x20;                       └──────┬─────────────┬──────┘
+
+&#x20;                                 │                 │
+
+&#x20;                 (Azure Network) │                 │ (GCP Network)
+
+&#x20;                                 ▼                 ▼
+
+&#x20;                 ┌─────────────────┐   ┌─────────────────┐
+
+&#x20;                 │ Azure Astra DB         │   │  GCP BigQuery         │
+
+&#x20;                 │   (NoSQL app)          │   │(Data Warehouse)       │
+
+&#x20;                 └────────┬────────┘   └────────┬────────┘
+
+&#x20;                             │                            │
+
+&#x20;                             └──────────┬──────────┘
+
+&#x20;                                            ▼
+
+&#x20;                       ┌───────────────────────────┐
+
+&#x20;                       │   Grafana Cloud/Looker              │◀─── \[Live Dashboard Graphs]
+
+&#x20;                       │    (Visual Monitoring)              │
+
+&#x20;                       └───────────────────────────┘
+
+
+
+Astra DB → stores raw hourly observations
+
+Python ETL → writes to Astra
+
+Doppler → secrets
+
+GitHub Actions → scheduling
+
+Python forecast script → writes predictions → BigQuery
+
+Python daily summary script → reads Astra → writes actuals → BigQuery
+
+BigQuery SQL → computes accuracy → BigQuery
+
+Grafana → visualizes accuracy
+
