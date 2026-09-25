@@ -1,0 +1,46 @@
+name: Daily Weather Pipeline
+
+on:
+  schedule:
+    - cron: "15 6 * * *"   # 00:15 MDT
+  workflow_dispatch:
+
+jobs:
+  run-daily-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: METAR ingestion
+        uses: dopplerhq/cli-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          command: doppler run --config gcp_personal -- python weather_observed_daily.py
+
+      - name: Daily summary
+        uses: dopplerhq/cli-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          command: doppler run --config gcp_personal -- python weather_observed_summary_daily.py
+
+      - name: Forecast ingestion
+        uses: dopplerhq/cli-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          command: doppler run --config gcp_personal -- python weather_forecast_daily.py
+
+      - name: Accuracy computation
+        uses: dopplerhq/cli-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          command: doppler run --config gcp_personal -- python weather_accuracy_daily.py

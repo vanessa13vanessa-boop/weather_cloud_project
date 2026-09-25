@@ -54,7 +54,7 @@ def insert_bigquery(doc):
         credentials=credentials
     )
 
-    table_id = os.environ["BQ_OBSERVED_TABLE"]
+    table_id = os.environ["BQ_OBSERVED_METAR_TABLE"]
 
     ndjson_data = json.dumps({
         "timestamp": doc["timestamp"],

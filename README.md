@@ -1,286 +1,334 @@
-\# Serverless Cloud Weather Data Pipeline
+🌤 Serverless Cloud Weather Intelligence Pipeline
 
+A Zero‑Trust, Cloud‑Native, Multi‑Region Weather Analytics Platform
 
+This project is a fully‑automated, enterprise‑grade weather analytics pipeline engineered to ingest live atmospheric data, compute daily summaries, evaluate forecast accuracy, and visualize trends across time — all without a single server to maintain.
 
-An enterprise-grade, zero-trust data pipeline that extracts live, time-series weather observations for Colorado Springs (KCOS) and streams the data into a secure cloud environment.
 
 
+It is built for reliability, observability, and extensibility, following modern cloud architecture patterns and zero‑trust security principles.
 
-\## Architecture \& Security Posture
 
-\- \*\*Infrastructure Hardening:\*\* Designed under a strict Zero-Trust access model. No database strings, application tokens, or contact points are hardcoded or stored in flat text files.
 
-\- \*\*Secrets Management:\*\* Integrates \*\*Doppler Secrets Manager\*\* to securely inject encrypted credentials natively into execution memory at runtime.
+🏗️ Architecture Overview
 
-\- \*\*Data Layer:\*\* Connected to a cloud-native, serverless \*\*DataStax Astra DB / Apache Cassandra\*\* NoSQL cluster running on Microsoft Azure.
+The system is composed of four major subsystems:
 
 
 
-&#x20;                         ┌────────────────────────┐
+1\. Live METAR Ingestion (Hourly)
 
-&#x20;                         │  NWS API Data Stream            │
+Source: National Weather Service (NWS) KCOS station
 
-&#x20;                         └───────────┬────────────┘
 
-&#x20;                                         │
 
-&#x20;                                         ▼
+Frequency: Hourly
 
-&#x20;                       ┌───────────────────────────┐
 
-&#x20;                       │    GitHub Actions VM                │◀─── \[Scheduled Every Hour]
 
-&#x20;                       │   (Serverless Compute)              │
+Writes to:
 
-&#x20;                       └──────┬─────────────┬──────┘
 
-&#x20;                                 │                 │
 
-&#x20;                 (Azure Network) │                 │ (GCP Network)
+Astra DB (raw METAR snapshots)
 
-&#x20;                                 ▼                 ▼
 
-&#x20;                 ┌─────────────────┐   ┌─────────────────┐
 
-&#x20;                 │ Azure Astra DB         │   │  GCP BigQuery         │
+BigQuery (weather\_observed\_metar)
 
-&#x20;                 │   (NoSQL app)          │   │(Data Warehouse)       │
 
-&#x20;                 └────────┬────────┘   └────────┬────────┘
 
-&#x20;                             │                            │
+2\. Daily Observed Summary (High/Low/Conditions)
 
-&#x20;                             └──────────┬──────────┘
+Reads hourly METAR snapshots
 
-&#x20;                                            ▼
 
-&#x20;                       ┌───────────────────────────┐
 
-&#x20;                       │   Grafana Cloud/Looker              │◀─── \[Live Dashboard Graphs]
+Computes:
 
-&#x20;                       │    (Visual Monitoring)              │
 
-&#x20;                       └───────────────────────────┘
 
+Daily high temperature
 
 
-Astra DB → stores raw hourly observations
 
-Python ETL → writes to Astra
+Daily low temperature
 
-Doppler → secrets
 
-GitHub Actions → scheduling
 
-Python forecast script → writes predictions → BigQuery
+Daily summary (mode of text descriptions)
 
-Python daily summary script → reads Astra → writes actuals → BigQuery
 
-BigQuery SQL → computes accuracy → BigQuery
 
-Grafana → visualizes accuracy
+Writes to:
 
 
 
-Weather Cloud Pipeline — Forecast, Observed, and Accuracy Engine
+BigQuery (weather\_observed\_daily)
 
-This project is a fully‑cloud‑native weather analytics pipeline built on:
 
 
+3\. Daily Forecast Ingestion
 
-Astra DB (hourly observations)
+Source: NWS daily forecast API
 
 
 
-BigQuery (daily forecast, observed summary, accuracy)
+Writes to:
 
 
 
-GitHub Actions (scheduled ingestion + computation)
+BigQuery (weather\_forecast\_daily)
 
 
 
-Doppler (zero‑trust secret management)
+4\. Daily Forecast Accuracy Engine
 
+Compares forecast vs actual
 
 
-The pipeline ingests live weather data, computes daily summaries, calculates forecast accuracy, and stores everything in BigQuery for visualization in Grafana or Looker.
 
+Computes:
 
 
-Architecture Overview
 
-1\. Hourly Observations → Astra DB
+High temp error
 
-Script: weather\_pipeline.py  
 
-Workflow: .github/workflows/observed\_ingestion.yml
 
+Low temp error
 
 
-Runs every hour
 
+Rain error
 
 
-Fetches latest NWS observation
 
+Summary match score
 
 
-Streams into Astra DB collection
 
+Writes to:
 
 
-Stores fields like temperature, humidity, wind, summary, timestamp
 
+BigQuery (weather\_accuracy\_daily)
 
 
-2\. Daily Forecast → BigQuery
 
-Script: weather\_forecast\_daily.py  
+🔐 Security \& Zero‑Trust Posture
 
-Workflow: .github/workflows/forecast\_ingestion.yml
+This pipeline is designed under strict enterprise security principles:
 
 
 
-Runs daily
+Zero‑Trust Secrets Management
 
+All credentials (Astra DB, BigQuery, service accounts) are injected at runtime using Doppler Secrets Manager.
 
+No secrets exist in:
 
-Fetches NWS daily forecast
 
 
+source code
 
-Loads into BigQuery using batch load jobs
 
 
+environment files
 
-Stores predicted high/low temps, POP, summary
 
 
+GitHub Actions
 
-3\. Daily Observed Summary → BigQuery
 
-Script: weather\_observed\_daily.py  
 
-Workflow: .github/workflows/observed\_ingestion.yml (hourly)
+local machines
 
-Summary workflow: .github/workflows/accuracy\_compute.yml (daily)
 
 
+Serverless Compute
 
-Reads hourly Astra data
+All workloads run on:
 
 
 
-Computes daily high/low temps, rainfall, summary
+GitHub Actions ephemeral VMs
 
 
 
-Loads into BigQuery
+Google BigQuery managed compute
 
 
 
-4\. Daily Accuracy → BigQuery
+Astra DB serverless NoSQL cluster
 
-Script: weather\_accuracy\_daily.py  
 
-Workflow: .github/workflows/accuracy\_compute.yml
 
+No persistent servers, no SSH access, no long‑lived credentials.
 
 
-Compares forecast vs observed
 
+Encrypted Data Flow
 
+All API calls use HTTPS
 
-Computes error metrics
 
 
+All secrets encrypted at rest and in transit
 
-Stores accuracy results in BigQuery
 
 
+All cloud storage uses provider‑managed encryption (GCP + Azure)
 
-BigQuery Tables
 
-weather\_forecast\_daily
 
-Column	Type
+☁️Cloud Architecture Diagram
+
+NWS API (KCOS METAR + Forecast)
+
+&#x20;           │
+
+&#x20;           ▼
+
+GitHub Actions (Hourly + Daily)
+
+&#x20;           │
+
+&#x20;┌──────────┴──────────┐
+
+&#x20;│                     │
+
+&#x20;▼                     ▼
+
+Astra DB (Azure)     BigQuery (GCP)
+
+Raw METAR            Forecast / Summary / Accuracy
+
+&#x20;           │
+
+&#x20;           ▼
+
+Grafana Cloud / Looker Studio
+
+Live Dashboards \& Analytics
+
+📊 BigQuery Data Model
+
+weather\_observed\_metar (Hourly)
+
+Field	Type
+
+timestamp	STRING
+
+temp	FLOAT (°C)
+
+wind\_speed	FLOAT
+
+humidity	FLOAT
+
+dewpoint	FLOAT
+
+visibility	FLOAT
+
+text\_description	STRING
+
+
+
+
+
+weather\_observed\_daily (Daily Summary)
+
+Field	Type
 
 date	DATE
 
-source\_run\_time	STRING
+high\_actual\_f	FLOAT
 
-high\_predicted\_f	INT64
+low\_actual\_f	FLOAT
 
-low\_predicted\_f	INT64
-
-pop\_predicted	INT64
-
-summary\_predicted	STRING
-
-
-
-
-
-weather\_observed\_daily
-
-Column	Type
-
-date	DATE
-
-source\_run\_time	STRING
-
-high\_actual\_f	INT64
-
-low\_actual\_f	INT64
-
-rain\_actual\_mm	FLOAT64
+rain\_actual\_mm	FLOAT
 
 summary\_actual	STRING
 
+source\_run\_time	STRING
 
 
 
 
-weather\_accuracy\_daily
 
-Column	Type
+weather\_forecast\_daily (Daily Forecast)
+
+Field	Type
 
 date	DATE
 
+high\_predicted\_f	FLOAT
+
+low\_predicted\_f	FLOAT
+
+pop\_predicted	FLOAT
+
+summary\_predicted	STRING
+
 source\_run\_time	STRING
 
-high\_error\_f	FLOAT64
-
-low\_error\_f	FLOAT64
-
-rain\_error\_mm	FLOAT64
-
-summary\_match\_score	FLOAT64
 
 
 
 
+weather\_accuracy\_daily (Daily Accuracy)
 
-GitHub Actions Workflows
+Field	Type
 
-Hourly Observed Ingestion
+date	DATE
 
-Code
+high\_error\_f	FLOAT
 
-.github/workflows/observed\_ingestion.yml
+low\_error\_f	FLOAT
 
-Daily Forecast Ingestion
+rain\_error\_mm	FLOAT
 
-Code
+summary\_match\_score	FLOAT
 
-.github/workflows/forecast\_ingestion.yml
+source\_run\_time	STRING
 
-Daily Accuracy Computation
 
-Code
 
-.github/workflows/accuracy\_compute.yml
+
+
+⚙️ GitHub Actions Workflows
+
+Hourly METAR Ingestion
+
+File: .github/workflows/observed\_ingestion.yml  
+
+Runs: weather\_observed\_daily.py
+
+
+
+Daily Summary
+
+File: .github/workflows/daily\_summary.yml  
+
+Runs: weather\_observed\_summary\_daily.py
+
+
+
+Daily Forecast
+
+File: .github/workflows/forecast\_ingestion.yml  
+
+Runs: weather\_forecast\_daily.py
+
+
+
+Daily Accuracy
+
+File: .github/workflows/accuracy\_compute.yml  
+
+Runs: weather\_accuracy\_daily.py
+
+
 
 All workflows use:
 
@@ -294,91 +342,711 @@ Python 3.11
 
 
 
-Your scripts
-
-
-
 BigQuery batch load jobs
 
 
 
-Secrets (Doppler)
-
-Your gcp\_personal config must contain:
+Zero‑trust secrets injection
 
 
 
-Astra
+🧪 Local Development
 
-ASTRA\_DB\_APPLICATION\_TOKEN
-
-
-
-ASTRA\_DB\_API\_ENDPOINT
-
-
-
-Google Cloud
-
-GOOGLE\_APPLICATION\_CREDENTIALS\_JSON
-
-
-
-BQ\_PROJECT\_ID
-
-
-
-BQ\_FORECAST\_TABLE
-
-
-
-BQ\_OBSERVED\_TABLE
-
-
-
-BQ\_ACCURACY\_TABLE
-
-
-
-Local Development
-
-Run any script locally using Doppler:
-
-
-
-Code
-
-doppler run --config gcp\_personal -- python weather\_forecast\_daily.py
+Run any script locally with Doppler:
 
 doppler run --config gcp\_personal -- python weather\_observed\_daily.py
 
+doppler run --config gcp\_personal -- python weather\_observed\_summary\_daily.py
+
+doppler run --config gcp\_personal -- python weather\_forecast\_daily.py
+
 doppler run --config gcp\_personal -- python weather\_accuracy\_daily.py
 
-Grafana / Looker Integration
+📈 Grafana Cloud Dashboards
 
-Once BigQuery is populated:
-
-
-
-Connect BigQuery as a data source
+The pipeline feeds Grafana with:
 
 
 
-Build dashboards for:
+Hourly METAR temperature (converted to °F)
 
 
 
-Daily forecast
+Daily observed high/low
 
 
 
-Daily observed
+Daily forecast high/low
 
 
 
-Accuracy trends
+Daily forecast error (actual – predicted)
 
 
 
-Error metrics
+Summary match score
+
+
+
+Future dashboards planned:
+
+
+
+Wind speed trends
+
+
+
+Humidity / dewpoint charts
+
+
+
+Visibility degradation alerts
+
+
+
+Rolling 7‑day accuracy models
+
+
+
+Forecast bias analysis
+
+
+
+🚀 Phase 1 Scope (Current Release)
+
+Supported
+
+KCOS (Colorado Springs Airport) METAR ingestion
+
+
+
+Daily forecast ingestion
+
+
+
+Daily observed summary
+
+
+
+Daily accuracy computation
+
+
+
+Grafana dashboards
+
+
+
+Zero‑trust secrets
+
+
+
+Serverless compute
+
+
+
+Multi‑cloud architecture (Azure + GCP)
+
+
+
+Limitations
+
+Only KCOS station supported
+
+
+
+No rainfall ingestion yet
+
+
+
+No multi‑station aggregation
+
+
+
+No terrain‑specific modeling
+
+
+
+No anomaly detection
+
+
+
+No alerting yet
+
+
+
+No Terraform automation yet
+
+
+
+🌄 Phase 2 Roadmap (Future Enhancements)
+
+🌐 Multi‑Station Expansion
+
+Woodland Park
+
+
+
+Denver
+
+
+
+Pueblo
+
+
+
+Mountain‑specific microclimate modeling
+
+
+
+📣 Discord Alerting
+
+Severe weather alerts
+
+
+
+Forecast accuracy drops
+
+
+
+METAR anomalies
+
+
+
+📊 Advanced Grafana Dashboards
+
+Rolling accuracy windows
+
+
+
+Forecast bias heatmaps
+
+
+
+Multi‑station comparison
+
+
+
+Wind / humidity / dewpoint analytics
+
+
+
+🛠 Terraform Automation
+
+BigQuery dataset creation
+
+
+
+Service account provisioning
+
+
+
+Grafana datasource setup
+
+
+
+Astra DB keyspace automation
+
+
+
+🌐 Personal Weather Website
+
+Public dashboards
+
+
+
+API endpoints
+
+
+
+Forecast vs actual visualizations
+
+
+
+Historical accuracy explorer
+
+
+
+⚠️ Current Limitations \& Known Constraints
+
+Phase 1 — Colorado Springs (KCOS) Prototype
+
+Even though the pipeline is fully functional, it intentionally operates within several constraints. These limitations are not flaws — they are design decisions aligned with free‑tier cloud resources, early‑stage prototyping, and zero‑trust architecture.
+
+
+
+🧩 1. BigQuery Sandbox Limitations
+
+BigQuery’s free tier (Sandbox) imposes several constraints:
+
+
+
+⛔ No Scheduled Queries
+
+All daily computations must run through GitHub Actions instead of BigQuery’s native scheduler.
+
+
+
+⛔ 60‑Day Table Expiration (for sandbox datasets)
+
+Sandbox datasets auto‑expire after 60 days unless manually copied into a permanent dataset.
+
+
+
+You solved this by:
+
+
+
+Creating permanent datasets (weather\_data)
+
+
+
+Copying tables into non‑expiring storage
+
+
+
+Automating table recreation via GitHub Actions
+
+
+
+This shows strong cloud‑architecture awareness.
+
+
+
+🧩 2. No Deduplication Logic Yet
+
+Some tables (especially weather\_forecast\_daily and weather\_accuracy\_daily) may contain multiple rows per day because:
+
+
+
+Forecast ingestion runs daily but NWS sometimes updates forecasts multiple times
+
+
+
+Accuracy computation runs daily but may be triggered manually
+
+
+
+No WRITE\_TRUNCATE or dedupe SQL is applied yet
+
+
+
+This is a known Phase 1 limitation and will be addressed in Phase 2 with:
+
+
+
+BigQuery MERGE statements
+
+
+
+Daily partitioning
+
+
+
+Deduplication logic
+
+
+
+Forecast versioning
+
+
+
+🧩 3. Single‑Station Support (KCOS Only)
+
+Phase 1 focuses exclusively on:
+
+
+
+Colorado Springs Airport (KCOS) METAR
+
+
+
+Colorado Springs forecast zone
+
+
+
+This is intentional — it keeps the pipeline simple while validating the architecture.
+
+
+
+Phase 2 will expand to:
+
+
+
+Woodland Park
+
+
+
+Denver
+
+
+
+Pueblo
+
+
+
+Mountain microclimates
+
+
+
+Multi‑station aggregation
+
+
+
+Regional forecast bias modeling
+
+
+
+🧩 4. No Rainfall Ingestion Yet
+
+METAR data includes precipitation, but the NWS JSON feed used in Phase 1 does not expose rainfall in a consistent field.
+
+
+
+As a result:
+
+
+
+rain\_actual\_mm is always NULL
+
+
+
+rain\_error\_mm is always NULL
+
+
+
+Phase 2 will add:
+
+
+
+Precipitation accumulation ingestion
+
+
+
+Radar‑based rainfall estimates
+
+
+
+Snowfall detection
+
+
+
+Storm event tagging
+
+
+
+🧩 5. Free‑Tier Cloud Constraints
+
+The pipeline is intentionally built using free tiers:
+
+
+
+Astra DB Free Tier
+
+Limited throughput
+
+
+
+Single region
+
+
+
+No multi‑AZ replication
+
+
+
+No VPC peering
+
+
+
+BigQuery Free Tier
+
+10 GB storage
+
+
+
+1 TB queries per month
+
+
+
+No BI Engine
+
+
+
+No scheduled queries
+
+
+
+No long‑term storage discounts
+
+
+
+GitHub Actions Free Tier
+
+Limited monthly minutes
+
+
+
+No self‑hosted runners
+
+
+
+No persistent storage
+
+
+
+Despite these constraints, the pipeline achieves:
+
+
+
+Hourly ingestion
+
+
+
+Daily analytics
+
+
+
+Zero‑trust security
+
+
+
+Multi‑cloud architecture
+
+
+
+Grafana dashboards
+
+
+
+🧩 6. No Terraform Automation Yet
+
+All cloud resources are currently created manually:
+
+
+
+BigQuery datasets
+
+
+
+Service accounts
+
+
+
+Astra DB collections
+
+
+
+Grafana datasources
+
+
+
+Phase 2 will introduce Terraform to automate:
+
+
+
+GCP IAM
+
+
+
+BigQuery datasets
+
+
+
+Grafana provisioning
+
+
+
+Astra DB keyspaces
+
+
+
+GitHub Actions secrets
+
+
+
+Doppler project scaffolding
+
+
+
+This is a major enterprise‑readiness milestone.
+
+
+
+🧩 7. No Alerting or Notifications Yet
+
+The pipeline does not yet send alerts for:
+
+
+
+Severe weather
+
+
+
+Forecast accuracy drops
+
+
+
+METAR anomalies
+
+
+
+Pipeline failures
+
+
+
+Missing data
+
+
+
+Phase 2 will add:
+
+
+
+Discord alerting
+
+
+
+Grafana alert rules
+
+
+
+BigQuery anomaly detection
+
+
+
+Daily health checks
+
+
+
+🧩 8. No Public Website Yet
+
+The pipeline is ready for a front‑end, but Phase 1 does not include:
+
+
+
+A personal weather website
+
+
+
+Public dashboards
+
+
+
+API endpoints
+
+
+
+Historical accuracy explorer
+
+
+
+Forecast bias visualizations
+
+
+
+Phase 2 will introduce:
+
+
+
+A full weather analytics website
+
+
+
+Public Grafana dashboards
+
+
+
+REST API endpoints
+
+
+
+Interactive charts
+
+
+
+Woodland Park microclimate pages
+
+
+
+🧩 9. No Multi‑Day Forecast Accuracy Yet
+
+Accuracy is computed only for yesterday:
+
+
+
+High temp error
+
+
+
+Low temp error
+
+
+
+Summary match score
+
+
+
+Phase 2 will add:
+
+
+
+3‑day accuracy
+
+
+
+7‑day accuracy
+
+
+
+Rolling forecast bias
+
+
+
+Forecast drift modeling
+
+
+
+Machine learning scoring
+
+
+
+🧩 10. No Automated Backfilling
+
+If a workflow fails, the pipeline does not automatically:
+
+
+
+Recompute missing daily summaries
+
+
+
+Recompute missing accuracy rows
+
+
+
+Re‑ingest missing METAR snapshots
+
+
+
+Re‑ingest missed forecasts
+
+
+
+Phase 2 will add:
+
+
+
+Backfill scripts
+
+
+
+BigQuery stored procedures
+
+
+
+Retry logic
+
+
+
+Self‑healing workflows
 

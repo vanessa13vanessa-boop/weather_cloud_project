@@ -1,12 +1,12 @@
-name: Hourly METAR Ingestion
+name: Daily Observed Summary
 
 on:
   schedule:
-    - cron: "0 * * * *"   # Every hour
+    - cron: "30 6 * * *"   # 00:30 MDT (06:30 UTC)
   workflow_dispatch:
 
 jobs:
-  ingest-observed:
+  compute-summary:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,8 +21,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run METAR ingestion (Astra + BigQuery)
+      - name: Run daily summary
         uses: dopplerhq/cli-action@v1
         with:
           doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-          command: doppler run --config gcp_personal -- python weather_observed_daily.py
+          command: doppler run --config gcp_personal -- python weather_observed_summary_daily.py
